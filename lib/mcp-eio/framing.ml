@@ -6,40 +6,15 @@
 
 open Eio
 
-(* Convert between jsonrpc's Json.t and Yojson.Safe.t *)
-let rec json_to_yojson (json : Jsonrpc.Json.t) : Yojson.Safe.t =
-  match json with
-  | `Assoc lst -> `Assoc (List.map (fun (k, v) -> (k, json_to_yojson v)) lst)
-  | `Bool b -> `Bool b
-  | `Float f -> `Float f
-  | `Int i -> `Int i
-  | `Intlit s -> `Intlit s
-  | `List lst -> `List (List.map json_to_yojson lst)
-  | `Null -> `Null
-  | `String s -> `String s
-  | `Tuple lst -> `List (List.map json_to_yojson lst)
-  | `Variant (name, opt) -> (
-      match opt with
-      | None -> `Assoc [ ("variant", `String name) ]
-      | Some v ->
-          `Assoc [ ("variant", `String name); ("value", json_to_yojson v) ])
+(* Convert between jsonrpc's Json.t and Yojson.Safe.t.
+   In modern jsonrpc (>= 1.26) [Json.t] is defined as [Yojson.Safe.t], so these
+   are the identity. In older jsonrpc, [Json.t] and [Yojson.Safe.t] share the
+   same constructor set, so a plain type coercion is accepted by the type
+   checker on both. This keeps the code compiling across jsonrpc/yojson
+   versions without enumerating the version-specific constructors. *)
+let json_to_yojson (json : Jsonrpc.Json.t) : Yojson.Safe.t = (json :> Yojson.Safe.t)
 
-let rec yojson_to_json (yojson : Yojson.Safe.t) : Jsonrpc.Json.t =
-  match yojson with
-  | `Assoc lst -> `Assoc (List.map (fun (k, v) -> (k, yojson_to_json v)) lst)
-  | `Bool b -> `Bool b
-  | `Float f -> `Float f
-  | `Int i -> `Int i
-  | `Intlit s -> `Intlit s
-  | `List lst -> `List (List.map yojson_to_json lst)
-  | `Null -> `Null
-  | `String s -> `String s
-  | `Tuple lst -> `List (List.map yojson_to_json lst)
-  | `Variant (name, arg) -> (
-      match arg with
-      | None -> `Assoc [ ("variant", `String name) ]
-      | Some v ->
-          `Assoc [ ("variant", `String name); ("value", yojson_to_json v) ])
+let yojson_to_json (yojson : Yojson.Safe.t) : Jsonrpc.Json.t = (yojson :> Jsonrpc.Json.t)
 
 let write_packet (sink : _ Flow.sink) (packet : Jsonrpc.Packet.t) =
   let json = Jsonrpc.Packet.yojson_of_t packet in

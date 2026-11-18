@@ -1,24 +1,10 @@
 open Jsonrpc
 
-(* Convert Json.t to Yojson.Safe.t *)
-let rec json_to_yojson (json : Json.t) : Yojson.Safe.t =
-  match json with
-  | `Assoc lst -> `Assoc (List.map (fun (k, v) -> (k, json_to_yojson v)) lst)
-  | `Bool b -> `Bool b
-  | `Float f -> `Float f
-  | `Int i -> `Int i
-  | `Intlit s -> `Intlit s
-  | `List lst -> `List (List.map json_to_yojson lst)
-  | `Null -> `Null
-  | `String s -> `String s
-  | `Tuple lst ->
-      `List (List.map json_to_yojson lst) (* Convert tuple to list *)
-  | `Variant (name, opt) -> (
-      (* Convert variant to an object *)
-      match opt with
-      | None -> `Assoc [ ("variant", `String name) ]
-      | Some v ->
-          `Assoc [ ("variant", `String name); ("value", json_to_yojson v) ])
+(* Convert Json.t to Yojson.Safe.t.
+   In modern jsonrpc (>= 1.26) [Json.t] is [Yojson.Safe.t] (identity); in older
+   jsonrpc the two share the same constructor set, so a plain coercion works on
+   both. *)
+let json_to_yojson (json : Json.t) : Yojson.Safe.t = (json :> Yojson.Safe.t)
 
 (* Convert jsonrpc types to Yojson *)
 let structured_to_yojson (s : Structured.t option) : Yojson.Safe.t option =
