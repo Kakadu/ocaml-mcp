@@ -28,6 +28,18 @@ module Error = struct
     | Process_error msg -> Printf.sprintf "Process error: %s" msg
 end
 
+(* Eio.Process.run does not search $PATH for a bare executable name, so
+   resolve it to an absolute path ourselves. Falls back to the bare name
+   when it cannot be located. *)
+let resolve_executable name =
+  let path = try Sys.getenv "PATH" with Not_found -> "" in
+  List.find_map
+    (fun dir ->
+      let candidate = Filename.concat dir name in
+      if Sys.file_exists candidate then Some candidate else None)
+    (String.split_on_char ':' path)
+  |> Option.value ~default:name
+
 (* Get initialization directives from dune *)
 let get_dune_directives env =
   let fs = Eio.Stdenv.fs env in
@@ -42,7 +54,7 @@ let get_dune_directives env =
         (* Run dune top with timeout *)
         let output_result =
           try
-            Eio.Process.run process_mgr ~executable:"dune"
+            Eio.Process.run process_mgr ~executable:(resolve_executable "dune")
               [ "dune"; "top"; "." ]
               ~stdout:(Eio.Flow.buffer_sink output_buf);
             Ok (Buffer.contents output_buf)
@@ -102,7 +114,8 @@ let execute ~sw:_ ~env (_sdk : Ocaml_platform_sdk.t) (args : Args.t) =
   try
     (* Run ocaml *)
     let process_mgr = Eio.Stdenv.process_mgr env in
-    Eio.Process.run process_mgr ~executable:"ocaml" [ "ocaml"; "-noprompt" ]
+    Eio.Process.run process_mgr ~executable:(resolve_executable "ocaml")
+      [ "ocaml"; "-noprompt" ]
       ~stdin:(Eio.Flow.string_source (Buffer.contents input))
       ~stdout:(Eio.Flow.buffer_sink output_buf)
       ~stderr:(Eio.Flow.buffer_sink error_buf);
